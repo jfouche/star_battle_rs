@@ -1,7 +1,8 @@
 use std::f32::consts::FRAC_1_SQRT_2;
 
 use crate::components::{
-	FromPlayer, Laser, Life, MaxLife, Movable, Player, PlayerInfo, SpriteSize, Velocity,
+	FromPlayer, Laser, Life, MaxLife, Movable, Player, PlayerInfo, SpriteSize, ToFloat,
+	Velocity,
 };
 use crate::{
 	GameTextures, PlayerState, WinSize, DEFAULT_PLAYER_LIFE, PLAYER_LASER_SIZE,
@@ -25,13 +26,14 @@ impl Plugin for PlayerPlugin {
 			.add_system(player_keyboard_event_system)
 			.add_system(player_life_system)
 			.add_system(player_fire_system)
-			.add_system_set(SystemSet::new().with_run_criteria(FixedTimestep::step(0.2)).with_system(player_debug_system));
+			// .add_system_set(SystemSet::new().with_run_criteria(FixedTimestep::step(0.2)).with_system(player_debug_system))
+			;
 	}
 }
 
 fn player_life_spawn_system(mut commands: Commands, win_size: Res<WinSize>) {
 	const LIFE_COLOR: Color = Color::rgb(0.9, 0.1, 0.1);
-	const MAX_LIFE_COLOR: Color = Color::rgb(0.3, 0.3, 0.3);
+	const MAX_LIFE_COLOR: Color = Color::rgb(0.3, 0.3, 0.6);
 	let top = win_size.h / 2.;
 	let right = win_size.w / 2.;
 
@@ -172,6 +174,13 @@ fn player_keyboard_event_system(
 	}
 }
 
+fn life_width<T>(t: &T) -> f32
+where
+	T: ToFloat,
+{
+	20.0 * t.to_float()
+}
+
 fn player_life_system(
 	mut player_query: Query<&Life, With<Player>>,
 	mut life_query: Query<&mut Sprite, (With<PlayerInfo>, With<Life>)>,
@@ -180,12 +189,12 @@ fn player_life_system(
 		let mut life_sprite =
 			life_query.get_single_mut().expect("Can't get Sprite from PlayerInfo and Life");
 
-		let width = 20.0_f32 * life.0 as f32;
+		let width = life_width(life);
 		life_sprite.custom_size = Some(Vec2::new(width, 25.));
 	}
 }
 
-fn player_debug_system(	mut player_query: Query<&Life, With<Player>>){
+fn player_debug_system(mut player_query: Query<&Life, With<Player>>) {
 	if let Ok(life) = player_query.get_single() {
 		println!("Player : life={}", life.0);
 	}
