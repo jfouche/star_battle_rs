@@ -5,8 +5,8 @@ use bevy::prelude::*;
 use bevy::sprite::collide_aabb::collide;
 use bevy_inspector_egui::WorldInspectorPlugin;
 use components::{
-	Enemy, Explosion, ExplosionTimer, ExplosionToSpawn, FromEnemy, FromPlayer, Laser, Movable,
-	Player, SpriteSize, Velocity,
+	Enemy, Explosion, ExplosionTimer, ExplosionToSpawn, FromEnemy, FromPlayer, Laser, Life,
+	Movable, Player, SpriteSize, Velocity,
 };
 use enemy::EnemyPlugin;
 use player::PlayerPlugin;
@@ -43,6 +43,8 @@ const BASE_SPEED: f32 = 500.;
 const PLAYER_RESPAWN_DELAY: f64 = 2.;
 const ENEMY_MAX: u32 = 2;
 const FORMATION_MEMBERS_MAX: u32 = 2;
+
+const DEFAULT_PLAYER_LIFE: u32 = 5;
 
 // endregion: --- Game Constants
 
@@ -227,9 +229,11 @@ fn enemy_laser_hit_player_system(
 	mut player_state: ResMut<PlayerState>,
 	time: Res<Time>,
 	laser_query: Query<(Entity, &Transform, &SpriteSize), (With<Laser>, With<FromEnemy>)>,
-	player_query: Query<(Entity, &Transform, &SpriteSize), With<Player>>,
+	mut player_query: Query<(Entity, &Transform, &SpriteSize, &mut Life), With<Player>>,
 ) {
-	if let Ok((player_entity, player_tf, player_size)) = player_query.get_single() {
+	if let Ok((player_entity, player_tf, player_size, mut life)) =
+		player_query.get_single_mut()
+	{
 		let player_scale = player_tf.scale.xy();
 
 		for (laser_entity, laser_tf, laser_size) in laser_query.iter() {
@@ -245,15 +249,19 @@ fn enemy_laser_hit_player_system(
 
 			// perform the collision
 			if collision.is_some() {
-				// remove the player
-				commands.entity(player_entity).despawn();
-				player_state.shot(time.seconds_since_startup());
-
 				// remove the laser
 				commands.entity(laser_entity).despawn();
 
-				// spawn the explosionToSpawn
-				commands.spawn().insert(ExplosionToSpawn(player_tf.translation));
+				// life
+				life.0 -= 1;
+				if life.0 <= 0 {
+					// remove the player
+					commands.entity(player_entity).despawn();
+					player_state.shot(time.seconds_since_startup());
+
+					// spawn the explosionToSpawn
+					commands.spawn().insert(ExplosionToSpawn(player_tf.translation));
+				}
 
 				break;
 			}

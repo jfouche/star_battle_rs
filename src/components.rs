@@ -26,6 +26,24 @@ impl From<(f32, f32)> for SpriteSize {
 	}
 }
 
+#[derive(Component)]
+pub struct Life(pub u32);
+
+impl Life {
+	pub fn new(life: u32) -> Self {
+		Life {0: life}
+	}
+}
+
+#[derive(Component)]
+pub struct MaxLife(pub u32);
+
+impl MaxLife {
+	pub fn new(life: u32) -> Self {
+		MaxLife {0: life}
+	}
+}
+
 // endregion: --- Common Components
 
 // region:    --- Player Components
@@ -34,6 +52,9 @@ pub struct Player;
 
 #[derive(Component)]
 pub struct FromPlayer;
+
+#[derive(Component)]
+pub struct PlayerInfo;
 // endregion: --- Player Components
 
 // region:    --- Enemy Components

@@ -1,26 +1,73 @@
 use std::f32::consts::FRAC_1_SQRT_2;
 
-use crate::components::{FromPlayer, Laser, Movable, Player, SpriteSize, Velocity};
-use crate::{
-	GameTextures, PlayerState, WinSize, PLAYER_LASER_SIZE, PLAYER_RESPAWN_DELAY, PLAYER_SIZE,
-	SPRITE_SCALE,
+use crate::components::{
+	FromPlayer, Laser, Life, MaxLife, Movable, Player, PlayerInfo, SpriteSize, Velocity,
 };
-use bevy::prelude::*;
+use crate::{
+	GameTextures, PlayerState, WinSize, DEFAULT_PLAYER_LIFE, PLAYER_LASER_SIZE,
+	PLAYER_RESPAWN_DELAY, PLAYER_SIZE, SPRITE_SCALE,
+};
+use bevy::sprite::Anchor;
 use bevy::time::FixedTimestep;
+use bevy::{prelude::*, transform};
 
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
 	fn build(&self, app: &mut App) {
 		app.insert_resource(PlayerState::default())
+			.add_startup_system_to_stage(StartupStage::PostStartup, player_life_spawn_system)
 			.add_system_set(
 				SystemSet::new()
 					.with_run_criteria(FixedTimestep::step(0.5))
 					.with_system(player_spawn_system),
 			)
 			.add_system(player_keyboard_event_system)
-			.add_system(player_fire_system);
+			.add_system(player_life_system)
+			.add_system(player_fire_system)
+			.add_system_set(SystemSet::new().with_run_criteria(FixedTimestep::step(0.2)).with_system(player_debug_system));
 	}
+}
+
+fn player_life_spawn_system(mut commands: Commands, win_size: Res<WinSize>) {
+	const LIFE_COLOR: Color = Color::rgb(0.9, 0.1, 0.1);
+	const MAX_LIFE_COLOR: Color = Color::rgb(0.3, 0.3, 0.3);
+	let top = win_size.h / 2.;
+	let right = win_size.w / 2.;
+
+	commands
+		.spawn_bundle(SpriteBundle {
+			sprite: Sprite {
+				color: LIFE_COLOR,
+				custom_size: Some(Vec2::new(100., 25.)),
+				anchor: Anchor::TopLeft,
+				..default()
+			},
+			transform: Transform {
+				translation: Vec3::new(right - 120., top - 20., 20.0),
+				..default()
+			},
+			..default()
+		})
+		.insert(PlayerInfo)
+		.insert(Life::new(DEFAULT_PLAYER_LIFE));
+
+	commands
+		.spawn_bundle(SpriteBundle {
+			sprite: Sprite {
+				color: MAX_LIFE_COLOR,
+				custom_size: Some(Vec2::new(100., 25.)),
+				anchor: Anchor::TopLeft,
+				..default()
+			},
+			transform: Transform {
+				translation: Vec3::new(right - 120., top - 20., 10.0),
+				..default()
+			},
+			..default()
+		})
+		.insert(PlayerInfo)
+		.insert(MaxLife::new(DEFAULT_PLAYER_LIFE));
 }
 
 fn player_spawn_system(
@@ -53,7 +100,9 @@ fn player_spawn_system(
 			.insert(Player)
 			.insert(SpriteSize::from(PLAYER_SIZE))
 			.insert(Movable { auto_despawn: false })
-			.insert(Velocity { x: 0., y: 0. });
+			.insert(Velocity { x: 0., y: 0. })
+			.insert(Life::new(DEFAULT_PLAYER_LIFE))
+			.insert(MaxLife::new(DEFAULT_PLAYER_LIFE));
 
 		player_state.spawned();
 	}
@@ -105,20 +154,39 @@ fn player_keyboard_event_system(
 		let down = kb.pressed(KeyCode::Down);
 
 		let (vx, vy): (f32, f32) = match (left, right, up, down) {
-			(true, false, false, false) => (-1., 0.),
-			(false, true, false, false) => (1., 0.),
-			(false, false, true, false) => (0., 1.),
-			(false, false, false, true) => (0., -1.),
+			(true, false, false, false) => (-1., 0.), // LEFT
+			(false, true, false, false) => (1., 0.),  // RIGHT
+			(false, false, true, false) => (0., 1.),  // UP
+			(false, false, false, true) => (0., -1.), // DOWN
 
 			(true, false, true, false) => (-FRAC_1_SQRT_2, FRAC_1_SQRT_2), // LEFT UP
 			(true, false, false, true) => (-FRAC_1_SQRT_2, -FRAC_1_SQRT_2), // LEFT DOWN
-			(false, true, true, false) => (FRAC_1_SQRT_2, FRAC_1_SQRT_2), // RIGHT UP
+			(false, true, true, false) => (FRAC_1_SQRT_2, FRAC_1_SQRT_2),  // RIGHT UP
 			(false, true, false, true) => (FRAC_1_SQRT_2, -FRAC_1_SQRT_2), // RIGHT DOWN
 
-			_ => (0., 0.)
+			_ => (0., 0.),
 		};
 
 		velocity.x = vx;
 		velocity.y = vy;
+	}
+}
+
+fn player_life_system(
+	mut player_query: Query<&Life, With<Player>>,
+	mut life_query: Query<&mut Sprite, (With<PlayerInfo>, With<Life>)>,
+) {
+	if let Ok(life) = player_query.get_single() {
+		let mut life_sprite =
+			life_query.get_single_mut().expect("Can't get Sprite from PlayerInfo and Life");
+
+		let width = 20.0_f32 * life.0 as f32;
+		life_sprite.custom_size = Some(Vec2::new(width, 25.));
+	}
+}
+
+fn player_debug_system(	mut player_query: Query<&Life, With<Player>>){
+	if let Ok(life) = player_query.get_single() {
+		println!("Player : life={}", life.0);
 	}
 }
