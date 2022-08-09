@@ -9,12 +9,14 @@ use components::{
 	Movable, Player, SpriteSize, Velocity,
 };
 use enemy::EnemyPlugin;
+use menu::MenuPlugin;
 use player::PlayerPlugin;
 use std::collections::HashSet;
 
 mod components;
 mod enemy;
 mod player;
+mod menu;
 
 // region:    --- Asset Constants
 
@@ -65,26 +67,42 @@ struct GameTextures {
 struct EnemyCount(u32);
 
 struct PlayerState {
-	on: bool,       // alive
-	last_shot: f64, // -1 if not shot
+	alive: bool,       // alive
+	last_shot: Option<f64>, // -1 if not shot
+	score: u32,
 }
+
 impl Default for PlayerState {
 	fn default() -> Self {
 		Self {
-			on: false,
-			last_shot: -1.,
+			alive: false,
+			last_shot: None,
+			score: 0
 		}
 	}
 }
 
 impl PlayerState {
-	pub fn shot(&mut self, time: f64) {
-		self.on = false;
-		self.last_shot = time;
-	}
 	pub fn spawned(&mut self) {
-		self.on = true;
-		self.last_shot = -1.;
+		self.alive = true;
+		self.last_shot = None;
+		self.score = 0;
+	}
+
+	pub fn shot(&mut self, time: f64) {
+		self.last_shot = Some(time);
+	}
+
+	pub fn killed(&mut self) {
+		self.alive = false;
+	}
+
+	pub fn score(&self) -> u32 {
+		self.score
+	}
+
+	pub fn inc_score(&mut self) {
+		self.score += 1;
 	}
 }
 // endregion: --- Resources
@@ -102,6 +120,7 @@ fn main() {
 		.add_plugin(WorldInspectorPlugin::new())
 		.add_plugin(PlayerPlugin)
 		.add_plugin(EnemyPlugin)
+		.add_plugin(MenuPlugin)
 		.add_startup_system(setup_system)
 		.add_system(movable_system)
 		.add_system(player_laser_hit_enemy_system)
@@ -174,6 +193,7 @@ fn movable_system(
 
 fn player_laser_hit_enemy_system(
 	mut commands: Commands,
+	mut player_state: ResMut<PlayerState>,
 	mut enemy_count: ResMut<EnemyCount>,
 	laser_query: Query<(Entity, &Transform, &SpriteSize), (With<Laser>, With<FromPlayer>)>,
 	enemy_query: Query<(Entity, &Transform, &SpriteSize), With<Enemy>>,
@@ -219,6 +239,9 @@ fn player_laser_hit_enemy_system(
 
 				// spawn the explosionToSpawn
 				commands.spawn().insert(ExplosionToSpawn(enemy_tf.translation));
+
+				// increment score
+				player_state.inc_score();
 			}
 		}
 	}
@@ -252,12 +275,17 @@ fn enemy_laser_hit_player_system(
 				// remove the laser
 				commands.entity(laser_entity).despawn();
 
+				// shot the player
+				player_state.shot(time.seconds_since_startup());
+
 				// life
 				life.0 -= 1;
 				if life.0 <= 0 {
+					// the player is dead
+					player_state.killed();
+
 					// remove the player
 					commands.entity(player_entity).despawn();
-					player_state.shot(time.seconds_since_startup());
 
 					// spawn the explosionToSpawn
 					commands.spawn().insert(ExplosionToSpawn(player_tf.translation));

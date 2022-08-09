@@ -17,60 +17,18 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
 	fn build(&self, app: &mut App) {
 		app.insert_resource(PlayerState::default())
-			.add_startup_system_to_stage(StartupStage::PostStartup, player_life_spawn_system)
 			.add_system_set(
 				SystemSet::new()
 					.with_run_criteria(FixedTimestep::step(0.5))
 					.with_system(player_spawn_system),
 			)
 			.add_system(player_keyboard_event_system)
-			.add_system(player_life_system)
 			.add_system(player_fire_system)
 			// .add_system_set(SystemSet::new().with_run_criteria(FixedTimestep::step(0.2)).with_system(player_debug_system))
 			;
 	}
 }
 
-fn player_life_spawn_system(mut commands: Commands, win_size: Res<WinSize>) {
-	const LIFE_COLOR: Color = Color::rgb(0.9, 0.1, 0.1);
-	const MAX_LIFE_COLOR: Color = Color::rgb(0.3, 0.3, 0.6);
-	let top = win_size.h / 2.;
-	let right = win_size.w / 2.;
-
-	commands
-		.spawn_bundle(SpriteBundle {
-			sprite: Sprite {
-				color: LIFE_COLOR,
-				custom_size: Some(Vec2::new(100., 25.)),
-				anchor: Anchor::TopLeft,
-				..default()
-			},
-			transform: Transform {
-				translation: Vec3::new(right - 120., top - 20., 20.0),
-				..default()
-			},
-			..default()
-		})
-		.insert(PlayerInfo)
-		.insert(Life::new(DEFAULT_PLAYER_LIFE));
-
-	commands
-		.spawn_bundle(SpriteBundle {
-			sprite: Sprite {
-				color: MAX_LIFE_COLOR,
-				custom_size: Some(Vec2::new(100., 25.)),
-				anchor: Anchor::TopLeft,
-				..default()
-			},
-			transform: Transform {
-				translation: Vec3::new(right - 120., top - 20., 10.0),
-				..default()
-			},
-			..default()
-		})
-		.insert(PlayerInfo)
-		.insert(MaxLife::new(DEFAULT_PLAYER_LIFE));
-}
 
 fn player_spawn_system(
 	mut commands: Commands,
@@ -82,7 +40,13 @@ fn player_spawn_system(
 	let now = time.seconds_since_startup();
 	let last_shot = player_state.last_shot;
 
-	if !player_state.on && (last_shot == -1. || now > last_shot + PLAYER_RESPAWN_DELAY) {
+	// The player should spawn if it's not 'alive' and after a `PLAYER_RESPAWN_DELAY` delay
+	let should_respawn = !player_state.alive && match last_shot {
+		None => true,
+		Some(time) => now > time + PLAYER_RESPAWN_DELAY
+	};
+
+	if should_respawn {
 		// add player
 		let bottom = -win_size.h / 2.;
 		commands
@@ -171,26 +135,6 @@ fn player_keyboard_event_system(
 
 		velocity.x = vx;
 		velocity.y = vy;
-	}
-}
-
-fn life_width<T>(t: &T) -> f32
-where
-	T: ToFloat,
-{
-	20.0 * t.to_float()
-}
-
-fn player_life_system(
-	mut player_query: Query<&Life, With<Player>>,
-	mut life_query: Query<&mut Sprite, (With<PlayerInfo>, With<Life>)>,
-) {
-	if let Ok(life) = player_query.get_single() {
-		let mut life_sprite =
-			life_query.get_single_mut().expect("Can't get Sprite from PlayerInfo and Life");
-
-		let width = life_width(life);
-		life_sprite.custom_size = Some(Vec2::new(width, 25.));
 	}
 }
 

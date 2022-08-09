@@ -72,6 +72,10 @@ pub struct FromPlayer;
 
 #[derive(Component)]
 pub struct PlayerInfo;
+
+#[derive(Component)]
+pub struct ScoreText;
+
 // endregion: --- Player Components
 
 // region:    --- Enemy Components
