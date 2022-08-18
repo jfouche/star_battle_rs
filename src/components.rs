@@ -26,7 +26,6 @@ impl From<(f32, f32)> for SpriteSize {
 	}
 }
 
-
 pub trait ToFloat {
 	fn to_float(&self) -> f32;
 }
@@ -36,7 +35,7 @@ pub struct Life(pub u32);
 
 impl Life {
 	pub fn new(life: u32) -> Self {
-		Life {0: life}
+		Life { 0: life }
 	}
 }
 
@@ -51,7 +50,7 @@ pub struct MaxLife(pub u32);
 
 impl MaxLife {
 	pub fn new(life: u32) -> Self {
-		MaxLife {0: life}
+		MaxLife { 0: life }
 	}
 }
 

@@ -5,7 +5,7 @@ use crate::components::{
 	Velocity,
 };
 use crate::{
-	GameTextures, PlayerState, WinSize, DEFAULT_PLAYER_LIFE, PLAYER_LASER_SIZE,
+	GameState, GameTextures, PlayerState, WinSize, DEFAULT_PLAYER_LIFE, PLAYER_LASER_SIZE,
 	PLAYER_RESPAWN_DELAY, PLAYER_SIZE, SPRITE_SCALE,
 };
 use bevy::sprite::Anchor;
@@ -17,18 +17,17 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
 	fn build(&self, app: &mut App) {
 		app.insert_resource(PlayerState::default())
-			.add_system_set(
-				SystemSet::new()
+		.add_system_set(
+			SystemSet::on_update(GameState::InGame)
 					.with_run_criteria(FixedTimestep::step(0.5))
 					.with_system(player_spawn_system),
 			)
-			.add_system(player_keyboard_event_system)
-			.add_system(player_fire_system)
+			.add_system_set(SystemSet::on_update(GameState::InGame)			.with_system(player_keyboard_event_system)
+			.with_system(player_fire_system))
 			// .add_system_set(SystemSet::new().with_run_criteria(FixedTimestep::step(0.2)).with_system(player_debug_system))
 			;
 	}
 }
-
 
 fn player_spawn_system(
 	mut commands: Commands,
@@ -41,10 +40,11 @@ fn player_spawn_system(
 	let last_shot = player_state.last_shot;
 
 	// The player should spawn if it's not 'alive' and after a `PLAYER_RESPAWN_DELAY` delay
-	let should_respawn = !player_state.alive && match last_shot {
-		None => true,
-		Some(time) => now > time + PLAYER_RESPAWN_DELAY
-	};
+	let should_respawn = !player_state.alive
+		&& match last_shot {
+			None => true,
+			Some(time) => now > time + PLAYER_RESPAWN_DELAY,
+		};
 
 	if should_respawn {
 		// add player

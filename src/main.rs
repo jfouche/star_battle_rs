@@ -9,14 +9,16 @@ use components::{
 	Movable, Player, SpriteSize, Velocity,
 };
 use enemy::EnemyPlugin;
-use menu::MenuPlugin;
 use player::PlayerPlugin;
+use status::StatusPlugin;
 use std::collections::HashSet;
 
 mod components;
 mod enemy;
-mod player;
 mod menu;
+mod player;
+mod splash;
+mod status;
 
 // region:    --- Asset Constants
 
@@ -67,7 +69,7 @@ struct GameTextures {
 struct EnemyCount(u32);
 
 struct PlayerState {
-	alive: bool,       // alive
+	alive: bool,            // alive
 	last_shot: Option<f64>, // -1 if not shot
 	score: u32,
 }
@@ -77,7 +79,7 @@ impl Default for PlayerState {
 		Self {
 			alive: false,
 			last_shot: None,
-			score: 0
+			score: 0,
 		}
 	}
 }
@@ -107,6 +109,14 @@ impl PlayerState {
 }
 // endregion: --- Resources
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+enum GameState {
+	Splash,
+	Menu,
+	InGame,
+	GamePaused,
+}
+
 fn main() {
 	App::new()
 		.insert_resource(ClearColor(Color::rgb(0.04, 0.04, 0.04)))
@@ -118,10 +128,13 @@ fn main() {
 		})
 		.add_plugins(DefaultPlugins)
 		.add_plugin(WorldInspectorPlugin::new())
+		.add_plugin(splash::SplashPlugin)
+		.add_plugin(menu::MenuPlugin)
 		.add_plugin(PlayerPlugin)
 		.add_plugin(EnemyPlugin)
-		.add_plugin(MenuPlugin)
+		.add_plugin(StatusPlugin)
 		.add_startup_system(setup_system)
+		.add_state(GameState::Splash)
 		.add_system(movable_system)
 		.add_system(player_laser_hit_enemy_system)
 		.add_system(enemy_laser_hit_player_system)
@@ -334,5 +347,15 @@ fn explosion_animation_system(
 				commands.entity(entity).despawn()
 			}
 		}
+	}
+}
+
+// Generic system that takes a component as a parameter, and will despawn all entities with that component
+pub fn despawn_screen<T: Component>(
+	to_despawn: Query<Entity, With<T>>,
+	mut commands: Commands,
+) {
+	for entity in &to_despawn {
+		commands.entity(entity).despawn_recursive();
 	}
 }
